@@ -1,0 +1,9 @@
+.DS_Store
+
+#remove built binaries
+build/*
+
+#remove built game files
+*.3dsx
+*.elf
+*.smdh
