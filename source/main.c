@@ -18,14 +18,15 @@
 #define PLAYER_START_Y 80
 
 //ball defines
+#define BALL_SIZE 10
 #define BALL_DEFAULT_SPEED 2
 #define PADDLE_DEFAULT_POS 80
-#define BALL_DEFAULT_X SCREEN_WIDTH / 2
-#define BALL_DEFAULT_Y SCREEN_HIGHT / 2
+#define BALL_DEFAULT_X (SCREEN_WIDTH / 2) - (BALL_SIZE / 2)
+#define BALL_DEFAULT_Y (SCREEN_HIGHT / 2) - (BALL_SIZE / 2)
 
 //score display defines
-#define PLAYER_SCORE_X 260
-#define COM_SCORE_X 120
+#define PLAYER_SCORE_X 280
+#define COM_SCORE_X 100
 #define SCORE_Y 20
 #define SCORE_MAX_CHARS 12
 //global variables
@@ -35,9 +36,10 @@ float playerY = PLAYER_START_Y;
 float compY = PLAYER_START_Y;
 
 //computer dificulty
-float comp_speed = 1.5;
+float dificulty = 1;
 
 //ball position, initalized to the defaults
+float baseBallSpeed = BALL_DEFAULT_SPEED;
 float ballXPos = BALL_DEFAULT_X;
 float ballYPos = BALL_DEFAULT_Y;
 float ballSpeedX = BALL_DEFAULT_SPEED;
@@ -60,7 +62,7 @@ void BallBouncePlayer(float *ballSpeedX, float ballXPos, float ballYPos, float p
 		float mult = distFromCenter / (.5f * PADDLE_HIGHT);
 		mult = fabsf(mult);
 		printf("\x1b[16;1HLast Dist from Center Mult = %.4f", mult);
-		*ballSpeedX = -BALL_DEFAULT_SPEED * mult;
+		*ballSpeedX = -baseBallSpeed * mult;
 	}
 }
 
@@ -68,7 +70,7 @@ void BallBounceComp(float *ballSpeedX, float ballXPos, float ballYPos, float com
 {
 	if (((ballXPos <= COMP_X_POS) && (ballXPos >= (COMP_X_POS - PADDLE_HITBOX_THICKNES))) && ((ballYPos >= compY) && (ballYPos <= (compY + PADDLE_HIGHT))))
 	{
-		*ballSpeedX = BALL_DEFAULT_SPEED;
+		*ballSpeedX = baseBallSpeed;
 	}
 }
 
@@ -91,17 +93,34 @@ static void MakeText(int score, C2D_Font *font, C2D_TextBuf buff, C2D_Text* resu
 	
 }
 
-/*
-void ChangeDificulty(float *compSpeed) 
+
+void ChangeDificulty() 
 {
+	printf("\x1b[25;1HKeyboard Starting");
+
+	//init keyboard values
 	static SwkbdState swkbd;
-	static char mybuf[60];
-	static SwkbdStatusData swkbdStatus;
-	static SwkbdLearningData swkbdLearning;
+	static char buff[60];
+	//static SwkbdStatusData swkbdStatus;
+	//static SwkbdLearningData swkbdLearning;
 	SwkbdButton button = SWKBD_BUTTON_NONE;
 
+	 
 
-}*/
+	//init the keyboard info
+	swkbdInit(&swkbd, SWKBD_TYPE_NUMPAD, 1, 60);
+	swkbdSetHintText(&swkbd, "Enter computer speed multiplier. Default is 1");
+	swkbdSetValidation(&swkbd, SWKBD_NOTEMPTY_NOTBLANK, 0, 0);
+	
+	//create the keyboard
+	button = swkbdInputText(&swkbd, buff, sizeof(buff));
+
+	//make sure user did not cancel, and then apply change
+	if (button != SWKBD_BUTTON_NONE && button != SWKBD_BUTTON_LEFT) {
+		dificulty = atof(buff);
+		baseBallSpeed = BALL_DEFAULT_SPEED * dificulty;
+	}
+}
 
 
 int main(int argc, char **argv)
@@ -188,6 +207,13 @@ int main(int argc, char **argv)
 			last_com_score = comScore;
 		}
 		
+		//check if player wants to change com speed
+		if(kDown & KEY_B)
+		{
+			ChangeDificulty();
+		} else {
+			printf("\x1b[25;1H                 ");
+		}
 		
 		
 		//Render the scene
@@ -211,6 +237,8 @@ int main(int argc, char **argv)
 		printf("\x1b[11;1HGPU:     %6.2f%%\x1b[K", C3D_GetDrawingTime()*6.0f);
 		printf("\x1b[12;1HCmdBuf:  %6.2f%%\x1b[K", C3D_GetCmdBufUsage()*100.0f);
 
+		printf("\x1b[24;1HCOM speed = %f", dificulty);
+
 		
 
 		if (isPlaying)
@@ -232,22 +260,22 @@ int main(int argc, char **argv)
 
 			if (ballYPos >= 230)
 			{
-				ballSpeedY = -BALL_DEFAULT_SPEED;
+				ballSpeedY = -baseBallSpeed;
 			}
 			else if (ballYPos <= 0)
 			{
-				ballSpeedY = BALL_DEFAULT_SPEED;
+				ballSpeedY = baseBallSpeed;
 			}
 
 			if (ballXPos >= 390)
 			{
-				ballSpeedX = -BALL_DEFAULT_SPEED;
+				ballSpeedX = -baseBallSpeed;
 				comScore++;
 				isPlaying = false;
 			}
 			else if (ballXPos <= 0)
 			{
-				ballSpeedX = BALL_DEFAULT_SPEED;
+				ballSpeedX = baseBallSpeed;
 				playerScore++;
 				isPlaying = false;
 			}
@@ -256,11 +284,11 @@ int main(int argc, char **argv)
 			
 
 			if ((compY + (.5 * PADDLE_HIGHT)) < ballYPos) {
-				compY += comp_speed;
+				compY += dificulty * 1.5;
 			}
 			else if ((compY + (.5 * PADDLE_HIGHT)) > ballYPos)
 			{
-				compY -= comp_speed;
+				compY -= dificulty * 1.5;
 			}
 
 			BallBounceComp(&ballSpeedX, ballXPos, ballYPos, compY);
@@ -271,8 +299,8 @@ int main(int argc, char **argv)
 			}
 			ballXPos = BALL_DEFAULT_X;
 			ballYPos = BALL_DEFAULT_Y;
-			ballSpeedX = BALL_DEFAULT_SPEED;
-			ballSpeedY = BALL_DEFAULT_SPEED;
+			ballSpeedX = baseBallSpeed;
+			ballSpeedY = baseBallSpeed;
 			
 			playerY = PADDLE_DEFAULT_POS;
 			compY = PADDLE_DEFAULT_POS;
@@ -280,6 +308,8 @@ int main(int argc, char **argv)
 		}
 		
 
+		//draw halfway line
+		C2D_DrawRectSolid(199.5f, 0.0f, 0.0f, 2.0f, 240.0f, clrBlack);
 
 		//Shapes Drawing and moving
 		//draw player
@@ -289,7 +319,7 @@ int main(int argc, char **argv)
 		C2D_DrawRectSolid(COMP_X_POS - 10, compY, 0, 10, PADDLE_HIGHT, clrWhite);
 
 		//draw ball
-		C2D_DrawRectSolid(ballXPos, ballYPos, 0, 10, 10, clrWhite);
+		C2D_DrawRectSolid(ballXPos, ballYPos, 0, BALL_SIZE, BALL_SIZE, clrWhite);
 
 		//draw player score
 		C2D_DrawText(&playerScoreText, C2D_WithColor, PLAYER_SCORE_X, SCORE_Y, 1.0f, 1.0f, 1.0f, clrBlack);
@@ -299,15 +329,8 @@ int main(int argc, char **argv)
 
 		C3D_FrameEnd(0);
 
-		if(kDown & KEY_B)
-		{
-			//ChangeDificulty(&comp_speed);
-		}
+		
 
-
-		// Flush and swap framebuffers
-		//gfxFlushBuffers();
-		//gfxScreenSwapBuffers(GFX_BOTTOM, false);
 
 		//Wait for VBlank
 		gspWaitForVBlank();
