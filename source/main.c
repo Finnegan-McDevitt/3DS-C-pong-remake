@@ -5,19 +5,51 @@
 #include <stdlib.h>
 #include <math.h>
 
+//display defines
 #define SCREEN_WIDTH 400
 #define SCREEN_HIGHT 240
 
+//player defines
 #define PADDLE_HIGHT 80
 #define PADDLE_HITBOX_THICKNES 10
 #define PLAYER_X_POS 320
 #define COMP_X_POS 60
 #define PLAYER_SPEED 4
+#define PLAYER_START_Y 80
 
+//ball defines
 #define BALL_DEFAULT_SPEED 2
 #define PADDLE_DEFAULT_POS 80
-#define BALL_DEFAULT_X SCREEN_WIDTH / 2;
-#define BALL_DEFAULT_Y SCREEN_HIGHT / 2;
+#define BALL_DEFAULT_X SCREEN_WIDTH / 2
+#define BALL_DEFAULT_Y SCREEN_HIGHT / 2
+
+//score display defines
+#define PLAYER_SCORE_X 260
+#define COM_SCORE_X 120
+#define SCORE_Y 20
+#define SCORE_MAX_CHARS 12
+//global variables
+
+//player positions
+float playerY = PLAYER_START_Y;
+float compY = PLAYER_START_Y;
+
+//computer dificulty
+float comp_speed = 1.5;
+
+//ball position, initalized to the defaults
+float ballXPos = BALL_DEFAULT_X;
+float ballYPos = BALL_DEFAULT_Y;
+float ballSpeedX = BALL_DEFAULT_SPEED;
+float ballSpeedY = BALL_DEFAULT_SPEED;
+
+//scores
+int playerScore = 0;
+int comScore = 0;
+
+bool isPlaying = false;
+int last_player_score = -1;
+int last_com_score = -1;
 
 
 void BallBouncePlayer(float *ballSpeedX, float ballXPos, float ballYPos, float playerY)
@@ -40,20 +72,23 @@ void BallBounceComp(float *ballSpeedX, float ballXPos, float ballYPos, float com
 	}
 }
 
-static C2D_Text *MakeText(int score, C2D_Font font, C2D_TextBuf buff)
+static void MakeText(int score, C2D_Font *font, C2D_TextBuf buff, C2D_Text* result)
 {
-	C2D_Text result;
 	C2D_TextBufClear(buff);
-	char text[12];
+	char text[SCORE_MAX_CHARS];
 	snprintf(text, sizeof(text), "%d", score);
-	C2D_TextFontParse(&result, font, buff, text);
-	C2D_TextOptimize(&result);
-	if(!font)
+	C2D_TextFontParse(result, *font, buff, text);
+	C2D_TextOptimize(result);
+	
+	if(!*font)
 	{
-		printf("\x1b[13;1HChar Array = %s, Text Buffer = %s, Buffer of Text object = %s", text, buff, result.buf);
+		printf("\x1b[14;1HNo Font,");
+	} else {
+		printf("\x1b[14;1HFont,");
 	}
-	//result.font = NULL;
-	return &result;
+	printf("\x1b[14;9HChar Array = %s", text);
+	return;
+	
 }
 
 /*
@@ -81,16 +116,36 @@ int main(int argc, char **argv)
 	//Initialize console on top screen. Using NULL as the second argument tells the console library to use the internal console structure as current one
 	consoleInit(GFX_BOTTOM, NULL);
 
+	//TODO - make second render target that is the right eye, 
+	//and shift all of the sprites in the left screen right slightly, 
+	//and the right screen left slightly.
+	//USE THE THINGS IN gfx.h 
 	C3D_RenderTarget* top = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
 
 	u32 clrWhite = C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF);
 
 	u32 clrClear = C2D_Color32(0xF0, 0xBC, 0x2B, 0xFF);
 
-	//u32 clrBlack = C2D_Color32(0x00, 0x00, 0x00, 0xFF);
+	u32 clrBlack = C2D_Color32(0x00, 0x00, 0x00, 0xFF);
 
-	C2D_Font font = C2D_FontLoadSystem(CFG_REGION_USA);
-	C2D_TextBuf buff = C2D_TextBufNew(256);
+	romfsInit();
+	C2D_Font font = C2D_FontLoad("romfs:/cbf_std.bcfnt");
+	if (!font) {
+		printf("\x1b[26;1HFont is NULL");
+	}
+	
+	//create buffers for player score display
+	C2D_TextBuf playeScoreBuff = C2D_TextBufNew(SCORE_MAX_CHARS);
+
+	C2D_Text playerScoreText;
+	MakeText(playerScore, &font, playeScoreBuff, &playerScoreText);
+
+	//create buffers for com score display
+	C2D_TextBuf comScoreBuf = C2D_TextBufNew(SCORE_MAX_CHARS);
+
+	C2D_Text comScoreText;
+	MakeText(comScore, &font, comScoreBuf, &comScoreText);
+
 
 
 	//u32 kDownOld = 0, kHeldOld = 0, kUpOld = 0; //In these variables there will be information about keys detected in the previous frame
@@ -99,21 +154,7 @@ int main(int argc, char **argv)
 	printf("\x1b[2;1HCirclePad position:");
 	printf("\x1b[27;1HBy Finnegan McDevitt");
 
-	float playerY = 80;
 
-	float compY = 80;
-
-	float comp_speed = 1.5;
-
-	float ballXPos = BALL_DEFAULT_X;
-	float ballYPos = BALL_DEFAULT_Y;
-	float ballSpeedX = BALL_DEFAULT_SPEED;
-	float ballSpeedY = BALL_DEFAULT_SPEED;
-
-	int playerScore = 0;
-	int compScore = 0;
-
-	bool isPlaying = false;
 
 
 	// Main loop
@@ -136,8 +177,19 @@ int main(int argc, char **argv)
 
 		//Print the CirclePad position
 		
+		//display the score
+		if (last_player_score != playerScore){
+			MakeText(playerScore, &font, playeScoreBuff, &playerScoreText);
+			last_player_score = playerScore;
+		}
 
-		C2D_Text *playerScoreText = MakeText(playerScore, font, buff);
+		if (last_com_score != comScore){
+			MakeText(comScore, &font, comScoreBuf, &comScoreText);
+			last_com_score = comScore;
+		}
+		
+		
+		
 		//Render the scene
 		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 		C2D_TargetClear(top, clrClear);
@@ -153,27 +205,13 @@ int main(int argc, char **argv)
 
 		printf("\x1b[6;1HBall Speed X = %.2f, Y = %.2f", ballSpeedX, ballSpeedY);
 
-		printf("\x1b[7;1HPlayer Score = %d, Computer Score = %d", playerScore, compScore);
+		printf("\x1b[7;1HPlayer Score = %d, Computer Score = %d", playerScore, comScore);
 
 		printf("\x1b[10;1HCPU:     %6.2f%%\x1b[K", C3D_GetProcessingTime()*6.0f);
 		printf("\x1b[11;1HGPU:     %6.2f%%\x1b[K", C3D_GetDrawingTime()*6.0f);
 		printf("\x1b[12;1HCmdBuf:  %6.2f%%\x1b[K", C3D_GetCmdBufUsage()*100.0f);
 
-		if (!isPlaying)
-		{
-			if (kDown & KEY_A) 
-			{
-				isPlaying = true;
-			}
-			ballXPos = BALL_DEFAULT_X;
-			ballYPos = BALL_DEFAULT_Y;
-			ballSpeedX = BALL_DEFAULT_SPEED;
-			ballSpeedY = BALL_DEFAULT_SPEED;
-			
-			playerY = PADDLE_DEFAULT_POS;
-			compY = PADDLE_DEFAULT_POS;
-
-		}
+		
 
 		if (isPlaying)
 		{
@@ -204,7 +242,7 @@ int main(int argc, char **argv)
 			if (ballXPos >= 390)
 			{
 				ballSpeedX = -BALL_DEFAULT_SPEED;
-				compScore++;
+				comScore++;
 				isPlaying = false;
 			}
 			else if (ballXPos <= 0)
@@ -226,18 +264,38 @@ int main(int argc, char **argv)
 			}
 
 			BallBounceComp(&ballSpeedX, ballXPos, ballYPos, compY);
+		} else {
+			if (kDown & KEY_A) 
+			{
+				isPlaying = true;
+			}
+			ballXPos = BALL_DEFAULT_X;
+			ballYPos = BALL_DEFAULT_Y;
+			ballSpeedX = BALL_DEFAULT_SPEED;
+			ballSpeedY = BALL_DEFAULT_SPEED;
+			
+			playerY = PADDLE_DEFAULT_POS;
+			compY = PADDLE_DEFAULT_POS;
+
 		}
 		
 
 
 		//Shapes Drawing and moving
+		//draw player
 		C2D_DrawRectSolid(PLAYER_X_POS + 10, playerY, 0, 10, PADDLE_HIGHT, clrWhite);
 
+		//draw computer
 		C2D_DrawRectSolid(COMP_X_POS - 10, compY, 0, 10, PADDLE_HIGHT, clrWhite);
 
+		//draw ball
 		C2D_DrawRectSolid(ballXPos, ballYPos, 0, 10, 10, clrWhite);
 
-		C2D_DrawText(playerScoreText, C2D_WithColor, 10, 10, 0, 10, 10, clrWhite);
+		//draw player score
+		C2D_DrawText(&playerScoreText, C2D_WithColor, PLAYER_SCORE_X, SCORE_Y, 1.0f, 1.0f, 1.0f, clrBlack);
+
+		//draw com score
+		C2D_DrawText(&comScoreText, C2D_WithColor, COM_SCORE_X, SCORE_Y, 1.0f, 1.0f, 1.0f, clrBlack);
 
 		C3D_FrameEnd(0);
 
@@ -248,15 +306,15 @@ int main(int argc, char **argv)
 
 
 		// Flush and swap framebuffers
-		gfxFlushBuffers();
-		gfxScreenSwapBuffers(GFX_BOTTOM, false);
+		//gfxFlushBuffers();
+		//gfxScreenSwapBuffers(GFX_BOTTOM, false);
 
 		//Wait for VBlank
 		gspWaitForVBlank();
 	}
 
 	// Exit services
-	C2D_TextBufDelete(buff);
+	C2D_TextBufDelete(playeScoreBuff);
 	C2D_FontFree(font);
 	C2D_Fini();
 	C3D_Fini();
