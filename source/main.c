@@ -122,6 +122,7 @@ void ChangeDificulty()
 
 	//init the keyboard info
 	swkbdInit(&swkbd, SWKBD_TYPE_NUMPAD, 1, 60);
+	swkbdSetNumpadKeys(&swkbd, '.', 0); //add a decimal point key to the numpad (0 = no key on the right)
 	swkbdSetHintText(&swkbd, "Enter computer speed multiplier. Default is 1");
 	swkbdSetValidation(&swkbd, SWKBD_NOTEMPTY_NOTBLANK, 0, 0);
 	
@@ -269,16 +270,14 @@ int main(int argc, char **argv)
 		printf("\x1b[24;1HCOM speed = %f", dificulty);
 
 		
-
 		if (isPlaying)
 		{
-			u32 currentButton64 = 64;
-			u32 currentButton128 = 128;
-			if ((pos.dy > 0 || (kDown & currentButton64) || (kHeld & currentButton64)) && (playerY > 0))
+
+			if (((kDown & KEY_UP) || (kHeld & KEY_UP)) && (playerY > 0))
 			{
 				playerY -= PLAYER_SPEED;
 			}
-			if ((pos.dy < 0 || (kDown & currentButton128) || (kHeld & currentButton128)) && (playerY < (240 - PADDLE_HIGHT)))
+			if (((kDown & KEY_DOWN) || (kHeld & KEY_DOWN)) && (playerY < (240 - PADDLE_HIGHT)))
 			{
 				playerY += PLAYER_SPEED;
 			}

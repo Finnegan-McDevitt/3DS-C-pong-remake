@@ -38,6 +38,9 @@ DATA		:=	data
 INCLUDES	:=	include
 GRAPHICS	:=	gfx
 GFXBUILD	:=	$(BUILD)
+APP_TITLE	:= 	C Pong Remake
+APP_DESCRIPTION	:=	A remake of the game pong I made for 3ds.
+APP_AUTHOR	:=	Finnegan McDevitt
 #ROMFS		:=	romfs
 #GFXBUILD	:=	$(ROMFS)/gfx
 
