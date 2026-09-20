@@ -29,7 +29,20 @@
 #define COM_SCORE_X 100
 #define SCORE_Y 20
 #define SCORE_MAX_CHARS 12
+
+//stereoscopic 3d defines
+//max number of pixels the paddles are shifted per eye when the 3d slider is all the way up.
+//keep around 4-6
+#define MAX_POPOUT 6.0f
+//the ball pops out a bit further than the paddles
+#define BALL_POPOUT_MULT 1.2f
 //global variables
+
+//colors and score text, shared with DrawScene
+u32 clrWhite;
+u32 clrBlack;
+C2D_Text playerScoreText;
+C2D_Text comScoreText;
 
 //player positions
 float playerY = PLAYER_START_Y;
@@ -122,11 +135,39 @@ void ChangeDificulty()
 	}
 }
 
+//draws the whole top screen for one eye.
+//eye is the number of pixels to shift the pop-out objects horizontally:
+//positive for the left eye, negative for the right eye, so the object appears in front of the screen.
+//the halfway line and the score text are drawn at the same spot for both eyes so they stay flat on the screen.
+static void DrawScene(float eye)
+{
+	//draw halfway line (no 3d)
+	C2D_DrawRectSolid(199.5f, 0.0f, 0.0f, 2.0f, 240.0f, clrBlack);
+
+	//Shapes Drawing and moving
+	//draw player
+	C2D_DrawRectSolid(PLAYER_X_POS + 10 + eye, playerY, 0, 10, PADDLE_HIGHT, clrWhite);
+
+	//draw computer
+	C2D_DrawRectSolid(COMP_X_POS - 10 + eye, compY, 0, 10, PADDLE_HIGHT, clrWhite);
+
+	//draw ball, pops out further than the paddles
+	C2D_DrawRectSolid(ballXPos + (eye * BALL_POPOUT_MULT), ballYPos, 0, BALL_SIZE, BALL_SIZE, clrWhite);
+
+	//draw player score (no 3d)
+	C2D_DrawText(&playerScoreText, C2D_WithColor, PLAYER_SCORE_X, SCORE_Y, 1.0f, 1.0f, 1.0f, clrBlack);
+
+	//draw com score (no 3d)
+	C2D_DrawText(&comScoreText, C2D_WithColor, COM_SCORE_X, SCORE_Y, 1.0f, 1.0f, 1.0f, clrBlack);
+}
+
 
 int main(int argc, char **argv)
 {
 	// Initialize services
 	gfxInitDefault();
+	//turn on stereoscopic 3d for the top screen
+	gfxSet3D(true);
 
 	C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
 	C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
@@ -135,34 +176,29 @@ int main(int argc, char **argv)
 	//Initialize console on top screen. Using NULL as the second argument tells the console library to use the internal console structure as current one
 	consoleInit(GFX_BOTTOM, NULL);
 
-	//TODO - make second render target that is the right eye, 
-	//and shift all of the sprites in the left screen right slightly, 
-	//and the right screen left slightly.
-	//USE THE THINGS IN gfx.h 
-	C3D_RenderTarget* top = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
+	//one render target per eye. the scene is drawn twice per frame, with the pop-out
+	//objects shifted right for the left eye and left for the right eye
+	C3D_RenderTarget* topLeft = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
+	C3D_RenderTarget* topRight = C2D_CreateScreenTarget(GFX_TOP, GFX_RIGHT);
 
-	u32 clrWhite = C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF);
+	clrWhite = C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF);
 
 	u32 clrClear = C2D_Color32(0xF0, 0xBC, 0x2B, 0xFF);
 
-	u32 clrBlack = C2D_Color32(0x00, 0x00, 0x00, 0xFF);
+	clrBlack = C2D_Color32(0x00, 0x00, 0x00, 0xFF);
 
-	romfsInit();
-	C2D_Font font = C2D_FontLoad("romfs:/cbf_std.bcfnt");
+	//load the North American region system font
+	C2D_Font font = C2D_FontLoadSystem(CFG_REGION_USA);
 	if (!font) {
 		printf("\x1b[26;1HFont is NULL");
 	}
 	
 	//create buffers for player score display
 	C2D_TextBuf playeScoreBuff = C2D_TextBufNew(SCORE_MAX_CHARS);
-
-	C2D_Text playerScoreText;
 	MakeText(playerScore, &font, playeScoreBuff, &playerScoreText);
 
 	//create buffers for com score display
 	C2D_TextBuf comScoreBuf = C2D_TextBufNew(SCORE_MAX_CHARS);
-
-	C2D_Text comScoreText;
 	MakeText(comScore, &font, comScoreBuf, &comScoreText);
 
 
@@ -216,13 +252,6 @@ int main(int argc, char **argv)
 		}
 		
 		
-		//Render the scene
-		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-		C2D_TargetClear(top, clrClear);
-		C2D_SceneBegin(top);
-
-
-
 		printf("\x1b[3;1H%04d %04d", pos.dx, pos.dy);
 
 		printf("\x1b[4;1HPlayer Y = %.2f", playerY);
@@ -306,26 +335,29 @@ int main(int argc, char **argv)
 			compY = PADDLE_DEFAULT_POS;
 
 		}
-		
 
-		//draw halfway line
-		C2D_DrawRectSolid(199.5f, 0.0f, 0.0f, 2.0f, 240.0f, clrBlack);
 
-		//Shapes Drawing and moving
-		//draw player
-		C2D_DrawRectSolid(PLAYER_X_POS + 10, playerY, 0, 10, PADDLE_HIGHT, clrWhite);
+		//read the 3d slider (0 = off, 1 = all the way up) and turn it into a pixel shift
+		float slider = osGet3DSliderState();
+		float depth = slider * MAX_POPOUT;
+		printf("\x1b[8;1H3D slider = %.2f, depth = %.2f px", slider, depth);
 
-		//draw computer
-		C2D_DrawRectSolid(COMP_X_POS - 10, compY, 0, 10, PADDLE_HIGHT, clrWhite);
+		//Render the scene, once per eye
+		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 
-		//draw ball
-		C2D_DrawRectSolid(ballXPos, ballYPos, 0, BALL_SIZE, BALL_SIZE, clrWhite);
+		//left eye, pop-out objects shifted right
+		C2D_TargetClear(topLeft, clrClear);
+		C2D_SceneBegin(topLeft);
+		DrawScene(depth);
 
-		//draw player score
-		C2D_DrawText(&playerScoreText, C2D_WithColor, PLAYER_SCORE_X, SCORE_Y, 1.0f, 1.0f, 1.0f, clrBlack);
-
-		//draw com score
-		C2D_DrawText(&comScoreText, C2D_WithColor, COM_SCORE_X, SCORE_Y, 1.0f, 1.0f, 1.0f, clrBlack);
+		//right eye, pop-out objects shifted left.
+		//skipped when the slider is off so the game runs at full speed in 2d
+		if (depth > 0.0f)
+		{
+			C2D_TargetClear(topRight, clrClear);
+			C2D_SceneBegin(topRight);
+			DrawScene(-depth);
+		}
 
 		C3D_FrameEnd(0);
 
