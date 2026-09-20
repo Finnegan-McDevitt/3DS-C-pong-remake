@@ -189,9 +189,9 @@ int main(int argc, char **argv)
 
 	//load the North American region system font
 	C2D_Font font = C2D_FontLoadSystem(CFG_REGION_USA);
-	if (!font) {
-		printf("\x1b[26;1HFont is NULL");
-	}
+	// if (!font) {
+	// 	printf("\x1b[26;1HFont is NULL");
+	// }
 	
 	//create buffers for player score display
 	C2D_TextBuf playeScoreBuff = C2D_TextBufNew(SCORE_MAX_CHARS);
@@ -370,6 +370,7 @@ int main(int argc, char **argv)
 
 	// Exit services
 	C2D_TextBufDelete(playeScoreBuff);
+	C2D_TextBufDelete(comScoreBuf);
 	C2D_FontFree(font);
 	C2D_Fini();
 	C3D_Fini();
